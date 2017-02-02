@@ -5,7 +5,7 @@ else
 OBJECTS += $(patsubst %.c,%.o,$(wildcard src/linux/*.c))
 endif
 
-CPPFLAGS += -Iinclude -I.
+CPPFLAGS += -Iinclude -I. -I../
 CFLAGS += -fPIC
 
 include Makedefs
