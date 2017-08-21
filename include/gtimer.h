@@ -27,8 +27,10 @@ typedef struct {
 extern "C" {
 #endif
 
-int gtimer_start(int user, unsigned int usec, const GTIMER_CALLBACKS * callbacks);
-int gtimer_close(int timer);
+struct gtimer;
+
+struct gtimer * gtimer_start(void * user, unsigned int usec, const GTIMER_CALLBACKS * callbacks);
+int gtimer_close(struct gtimer * timer);
 
 #ifdef __cplusplus
 }

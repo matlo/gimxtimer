@@ -5,7 +5,7 @@
 
 #include <gtimer.h>
 #include <gimxcommon/include/gerror.h>
-
+#include <gimxcommon/include/glist.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -13,66 +13,34 @@
 #include <string.h>
 #include <sys/time.h>
 #include <inttypes.h>
+#include <stdlib.h>
 
-#define MAX_TIMERS 32
-
-static struct {
+struct gtimer {
   int fd;
-  int user;
+  void * user;
   GPOLL_READ_CALLBACK fp_read;
   GPOLL_CLOSE_CALLBACK fp_close;
   GTIMER_REMOVE_SOURCE fp_remove;
-} timers[MAX_TIMERS] = { };
+  GLIST_LINK(struct gtimer)
+};
 
-#define CHECK_TIMER(TIMER,RETVALUE) \
-  if (TIMER < 0 || TIMER >= MAX_TIMERS || timers[TIMER].fd < 0) { \
-    PRINT_ERROR_OTHER("invalid timer") \
-    return RETVALUE; \
-  }
+GLIST_INST(struct gtimer, timers, gtimer_close)
 
-void gtimer_init(void) __attribute__((constructor));
-void gtimer_init(void) {
-  unsigned int i;
-  for (i = 0; i < sizeof(timers) / sizeof(*timers); ++i) {
-    timers[i].fd = -1;
-  }
+static int close_callback(void * user) {
+
+  struct gtimer * timer = (struct gtimer *) user;
+
+  return timer->fp_close(timer->user);
 }
 
-void gtimer_clean(void) __attribute__((destructor));
-void gtimer_clean(void) {
-  unsigned int i;
-  for (i = 0; i < sizeof(timers) / sizeof(*timers); ++i) {
-    if (timers[i].fd >= 0) {
-      gtimer_close(i);
-    }
-  }
-}
+static int read_callback(void * user) {
 
-static int get_slot() {
-  unsigned int i;
-  for (i = 0; i < sizeof(timers) / sizeof(*timers); ++i) {
-    if (timers[i].fd < 0) {
-      return i;
-    }
-  }
-  return -1;
-}
-
-static int close_callback(int timer) {
-
-  CHECK_TIMER(timer, -1)
-
-  return timers[timer].fp_close(timers[timer].user);
-}
-
-static int read_callback(int timer) {
-
-  CHECK_TIMER(timer, -1)
+  struct gtimer * timer = (struct gtimer *) user;
 
   uint64_t nexp;
   ssize_t res;
 
-  res = read(timers[timer].fd, &nexp, sizeof(nexp));
+  res = read(timer->fd, &nexp, sizeof(nexp));
   if (res != sizeof(nexp)) {
     PRINT_ERROR_ERRNO("read")
     return -1;
@@ -83,10 +51,10 @@ static int read_callback(int timer) {
       fprintf (stderr, "%ld.%06ld timer fired %" PRIu64 " times...\n", tv.tv_sec, tv.tv_usec, nexp);
   }
 
-  return timers[timer].fp_read(timers[timer].user);
+  return timer->fp_read(timer->user);
 }
 
-int gtimer_start(int user, unsigned int usec, const GTIMER_CALLBACKS * callbacks) {
+struct gtimer * gtimer_start(void * user, unsigned int usec, const GTIMER_CALLBACKS * callbacks) {
 
   __time_t sec = usec / 1000000;
   __time_t nsec = (usec - sec * 1000000) * 1000;
@@ -96,32 +64,32 @@ int gtimer_start(int user, unsigned int usec, const GTIMER_CALLBACKS * callbacks
   if (callbacks->fp_register == NULL)
   {
     PRINT_ERROR_OTHER("fp_register is NULL")
-    return -1;
+    return NULL;
   }
 
   if (callbacks->fp_remove == NULL)
   {
     PRINT_ERROR_OTHER("fp_remove is NULL")
-    return -1;
-  }
-
-  int slot = get_slot();
-  if (slot < 0) {
-    PRINT_ERROR_OTHER("no slot available")
-    return -1;
+    return NULL;
   }
 
   int tfd = timerfd_create(CLOCK_MONOTONIC, 0);
   if (tfd < 0) {
     PRINT_ERROR_ERRNO("timerfd_create")
-    return -1;
+    return NULL;
   }
 
   int ret = timerfd_settime(tfd, 0, &new_value, NULL);
   if (ret) {
     PRINT_ERROR_ERRNO("timerfd_settime")
     close(tfd);
-    return -1;
+    return NULL;
+  }
+
+  struct gtimer * timer = calloc(1, sizeof(*timer));
+  if (timer == NULL) {
+    PRINT_ERROR_ALLOC_FAILED("calloc")
+    return NULL;
   }
 
   GPOLL_CALLBACKS gpoll_callbacks = {
@@ -129,29 +97,32 @@ int gtimer_start(int user, unsigned int usec, const GTIMER_CALLBACKS * callbacks
           .fp_write = NULL,
           .fp_close = close_callback,
   };
-  ret = callbacks->fp_register(tfd, slot, &gpoll_callbacks);
+  ret = callbacks->fp_register(tfd, timer, &gpoll_callbacks);
   if (ret < 0) {
     close(tfd);
-    return -1;
+    free(timer);
+    return NULL;
   }
 
-  timers[slot].fd = tfd;
-  timers[slot].user = user;
-  timers[slot].fp_read = callbacks->fp_read;
-  timers[slot].fp_close = callbacks->fp_close;
-  timers[slot].fp_remove = callbacks->fp_remove;
+  timer->fd = tfd;
+  timer->user = user;
+  timer->fp_read = callbacks->fp_read;
+  timer->fp_close = callbacks->fp_close;
+  timer->fp_remove = callbacks->fp_remove;
 
-  return slot;
+  GLIST_ADD(timers, timer)
+
+  return timer;
 }
 
-int gtimer_close(int timer) {
+int gtimer_close(struct gtimer * timer) {
 
-  CHECK_TIMER(timer, -1)
+  timer->fp_remove(timer->fd);
+  close(timer->fd);
 
-  timers[timer].fp_remove(timers[timer].fd);
-  close(timers[timer].fd);
-  memset(timers + timer, 0x00, sizeof(*timers));
-  timers[timer].fd = -1;
+  GLIST_REMOVE(timers, timer)
+
+  free(timer);
 
   return 1;
 }

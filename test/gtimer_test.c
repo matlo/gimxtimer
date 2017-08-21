@@ -20,24 +20,28 @@ static unsigned int samples = 0;
 
 static int slices[] = { 10, 25, 50, 100, 200 };
 
-static struct {
-  unsigned int usec;
-  int timer;
-  unsigned long long int next;
-  unsigned int sum;
-  unsigned int count;
-  unsigned int slices[sizeof(slices) / sizeof(*slices) + 1];
-} timers[] = {
-    { 1000, -1, 0, 0, 0, {} },
-    { 2000, -1, 0, 0, 0, {} },
-    { 3000, -1, 0, 0, 0, {} },
-    { 4000, -1, 0, 0, 0, {} },
-    { 5000, -1, 0, 0, 0, {} },
-    { 6000, -1, 0, 0, 0, {} },
-    { 7000, -1, 0, 0, 0, {} },
-    { 8000, -1, 0, 0, 0, {} },
-    { 9000, -1, 0, 0, 0, {} },
-    { 10000, -1, 0, 0, 0, {} },
+struct timer_test {
+    unsigned int usec;
+    struct gtimer * timer;
+    unsigned long long int next;
+    unsigned int sum;
+    unsigned int count;
+    unsigned int slices[sizeof(slices) / sizeof(*slices) + 1];
+};
+
+#define ADD_TEST(PERIOD) { PERIOD, NULL, 0, 0, 0, {} },
+
+static struct timer_test timers[] = {
+    ADD_TEST(1000)
+    ADD_TEST(2000)
+    ADD_TEST(3000)
+    ADD_TEST(4000)
+    ADD_TEST(5000)
+    ADD_TEST(6000)
+    ADD_TEST(7000)
+    ADD_TEST(8000)
+    ADD_TEST(9000)
+    ADD_TEST(10000)
 };
 
 static void usage() {
@@ -64,14 +68,14 @@ static int read_args(int argc, char* argv[]) {
   return 0;
 }
 
-static int timer_close_callback(int user __attribute__((unused))) {
+static int timer_close_callback(void * user __attribute__((unused))) {
   set_done();
   return 1;
 }
 
-static inline void process(int timer, long long int diff) {
+static inline void process(struct timer_test * timer, long long int diff) {
 
-  int percent = diff * 100 / timers[timer].usec;
+  int percent = diff * 100 / timer->usec;
 
   unsigned int i;
   for (i = 0; i < sizeof(slices) / sizeof(*slices); ++i) {
@@ -79,19 +83,21 @@ static inline void process(int timer, long long int diff) {
           break;
       }
   }
-  timers[timer].slices[i]++;
+  timer->slices[i]++;
 
-  timers[timer].sum += diff;
-  ++timers[timer].count;
+  timer->sum += diff;
+  ++timer->count;
 
-  if (timer == sizeof(timers) / sizeof(*timers) - 1 && timers[timer].count == samples) {
+  if (timer == (timers + sizeof(timers) / sizeof(*timers) - 1) && timer->count == samples) {
     set_done();
   }
 }
 
-static int timer_read_callback(int user) {
+static int timer_read_callback(void * user) {
 
-  long long int diff = get_time() - timers[user].next;
+  struct timer_test * timer = (struct timer_test *) user;
+
+  long long int diff = get_time() - timer->next;
 
   // Tolerate early firing:
   // - the delay between the timer firing and the process scheduling may vary
@@ -102,11 +108,11 @@ static int timer_read_callback(int user) {
   process(user, abs(diff));
 
 #ifdef WIN32
-  timers[user].next = get_time() + timers[user].usec;
+  timer->next = get_time() + timer->usec;
 #else
   do {
-    timers[user].next += timers[user].usec;
-  } while (timers[user].next <= get_time());
+    timer->next += timer->usec;
+  } while (timer->next <= get_time());
 #endif
 
   return 1; // Returning a non-zero value makes gpoll return, allowing to check the 'done' variable.
@@ -129,7 +135,7 @@ int main(int argc, char* argv[]) {
             .fp_register = REGISTER_FUNCTION,
             .fp_remove = REMOVE_FUNCTION,
     };
-    timers[i].timer = gtimer_start(i, timers[i].usec, &timer_callbacks);
+    timers[i].timer = gtimer_start(timers + i, timers[i].usec, &timer_callbacks);
     if (timers[i].timer < 0) {
       set_done();
       break;
@@ -161,7 +167,7 @@ int main(int argc, char* argv[]) {
   printf("\t>%d\n", slices[j - 1]);
 
   for (i = 0; i < sizeof(timers) / sizeof(*timers); ++i) {
-    printf("%d\t%uus\t%u\t%u%%", timers[i].timer, timers[i].usec, timers[i].count, timers[i].sum / timers[i].count * 100 / timers[i].usec);
+    printf("%d\t%uus\t%u\t%u%%", i, timers[i].usec, timers[i].count, timers[i].sum / timers[i].count * 100 / timers[i].usec);
     for (j = 0; j < sizeof(timers[i].slices) / sizeof(*timers[i].slices); ++j) {
       printf("\t%d", timers[i].slices[j]);
     }
