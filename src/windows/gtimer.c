@@ -6,12 +6,15 @@
 #include <gtimer.h>
 #include <gimxcommon/include/gerror.h>
 #include <gimxcommon/include/glist.h>
+#include <gimxlog/include/glog.h>
 #include "timerres.h"
 
 #include <windows.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdint.h>
+
+GLOG_INST(GLOG_NAME)
 
 struct gtimer {
     void * user;
@@ -79,13 +82,17 @@ struct gtimer * gtimer_start(void * user, unsigned int usec, const GTIMER_CALLBA
     
     unsigned int period = usec * 10 / timer_resolution;
     if (period == 0) {
-        fprintf(stderr, "%s:%d %s: timer period should be at least %dus\n", __FILE__, __LINE__, __func__, timer_resolution / 10);
+        if (GLOG_LEVEL(GLOG_NAME,ERROR)) {
+            fprintf(stderr, "%s:%d %s: timer period should be at least %dus\n", __FILE__, __LINE__, __func__, timer_resolution / 10);
+        }
         timerres_end();
         return NULL;
     }
 
     if (period * timer_resolution != usec * 10) {
-        fprintf(stderr, "rounding timer period to %u\n", period * timer_resolution / 10);
+        if (GLOG_LEVEL(GLOG_NAME,INFO)) {
+            fprintf(stderr, "rounding timer period to %u\n", period * timer_resolution / 10);
+        }
     }
 
     struct gtimer * timer = calloc(1, sizeof(*timer));

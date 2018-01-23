@@ -6,6 +6,9 @@
 #include "timerres.h"
 #include <windows.h>
 #include <gimxcommon/include/gerror.h>
+#include <gimxlog/include/glog.h>
+
+GLOG_GET(GLOG_NAME)
 
 static void (__stdcall *pNtQueryTimerResolution)(PULONG, PULONG, PULONG) = NULL;
 static void (__stdcall *pNtSetTimerResolution)(ULONG, BOOL, PULONG) = NULL;
@@ -154,7 +157,9 @@ int timerres_begin(const GPOLL_INTERFACE * poll_interface, TIMERRES_CALLBACK tim
 
         pNtSetTimerResolution(maximumResolution, TRUE, &currentResolution);
 
-        printf("Timer resolution: min=%lu max=%lu current=%lu\n", minimumResolution, maximumResolution, currentResolution);
+        if (GLOG_LEVEL(GLOG_NAME,INFO)) {
+            printf("Timer resolution: min=%lu max=%lu current=%lu\n", minimumResolution, maximumResolution, currentResolution);
+        }
 
         timer_callback = timer_cb;
         fp_register = poll_interface->fp_register;

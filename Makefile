@@ -1,6 +1,6 @@
 ifeq ($(OS),Windows_NT)
+OBJECTS += gerror.o
 OBJECTS += $(patsubst %.c,%.o,$(wildcard src/windows/*.c))
-OBJECTS += ../gimxcommon/src/windows/gerror.o
 else
 OBJECTS += $(patsubst %.c,%.o,$(wildcard src/linux/*.c))
 endif
@@ -8,4 +8,12 @@ endif
 CPPFLAGS += -Iinclude -I. -I../
 CFLAGS += -fPIC
 
+LDFLAGS += -L../gimxlog
+LDLIBS += -lgimxlog
+
 include Makedefs
+
+ifeq ($(OS),Windows_NT)
+gerror.o: ../gimxcommon/src/windows/gerror.c
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
+endif

@@ -6,6 +6,7 @@
 #include <gtimer.h>
 #include <gimxcommon/include/gerror.h>
 #include <gimxcommon/include/glist.h>
+#include <gimxlog/include/glog.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -14,6 +15,8 @@
 #include <sys/time.h>
 #include <inttypes.h>
 #include <stdlib.h>
+
+GLOG_INST(GLOG_NAME)
 
 struct gtimer {
   int fd;
@@ -48,7 +51,9 @@ static int read_callback(void * user) {
   if (nexp > 1) {
       struct timeval tv;
       gettimeofday(&tv, NULL);
-      fprintf (stderr, "%ld.%06ld timer fired %" PRIu64 " times...\n", tv.tv_sec, tv.tv_usec, nexp);
+      if (GLOG_LEVEL(GLOG_NAME,ERROR)) {
+        fprintf (stderr, "%ld.%06ld timer fired %" PRIu64 " times...\n", tv.tv_sec, tv.tv_usec, nexp);
+      }
   }
 
   return timer->fp_read(timer->user);
