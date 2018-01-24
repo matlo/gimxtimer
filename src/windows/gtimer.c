@@ -91,7 +91,7 @@ struct gtimer * gtimer_start(void * user, unsigned int usec, const GTIMER_CALLBA
 
     if (period * timer_resolution != usec * 10) {
         if (GLOG_LEVEL(GLOG_NAME,INFO)) {
-            fprintf(stderr, "rounding timer period to %u\n", period * timer_resolution / 10);
+            printf("rounding timer period to %u\n", period * timer_resolution / 10);
         }
     }
 
