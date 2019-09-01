@@ -7,12 +7,12 @@
 #include <gimxcommon/include/gerror.h>
 #include <gimxcommon/include/glist.h>
 #include <gimxlog/include/glog.h>
+#include <gimxtime/include/gtime.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include <sys/time.h>
 #include <inttypes.h>
 #include <stdlib.h>
 
@@ -49,10 +49,9 @@ static int read_callback(void * user) {
     return -1;
   }
   if (nexp > 1) {
-      struct timeval tv;
-      gettimeofday(&tv, NULL);
+      gtime now = gtime_gettime();
       if (GLOG_LEVEL(GLOG_NAME,ERROR)) {
-        fprintf (stderr, "%ld.%06ld timer fired %" PRIu64 " times...\n", tv.tv_sec, tv.tv_usec, nexp);
+        fprintf (stderr, "%lu.%06lu timer fired %" PRIu64 " times...\n", GTIME_SECPART(now), GTIME_USECPART(now), nexp);
       }
   }
 

@@ -11,6 +11,7 @@
 #include <gimxpoll/include/gpoll.h>
 #include <gimxtimer/include/gtimer.h>
 #include <gimxprio/include/gprio.h>
+#include <gimxtime/include/gtime.h>
 
 #include <gimxcommon/test/common.h>
 #include <gimxcommon/test/handlers.c>
@@ -23,7 +24,7 @@ static int slices[] = { 10, 25, 50, 100, 200 };
 struct timer_test {
     unsigned int usec;
     struct gtimer * timer;
-    unsigned long long int next;
+    gtime next;
     unsigned int sum;
     unsigned int count;
     unsigned int slices[sizeof(slices) / sizeof(*slices) + 1];
@@ -97,7 +98,7 @@ static int timer_read_callback(void * user) {
 
   struct timer_test * timer = (struct timer_test *) user;
 
-  long long int diff = get_time() - timer->next;
+  long long int diff = gtime_gettime() - timer->next;
 
   // Tolerate early firing:
   // - the delay between the timer firing and the process scheduling may vary
@@ -108,11 +109,11 @@ static int timer_read_callback(void * user) {
   process(user, abs(diff));
 
 #ifdef WIN32
-  timer->next = get_time() + timer->usec;
+  timer->next = gtime_gettime() + timer->usec;
 #else
   do {
     timer->next += timer->usec;
-  } while (timer->next <= get_time());
+  } while (timer->next <= gtime_gettime());
 #endif
 
   return 1; // Returning a non-zero value makes gpoll return, allowing to check the 'done' variable.
@@ -141,7 +142,7 @@ int main(int argc, char* argv[]) {
       break;
     }
 
-    timers[i].next = get_time() + timers[i].usec;
+    timers[i].next = gtime_gettime() + timers[i].usec;
   }
 
   while(!is_done()) {

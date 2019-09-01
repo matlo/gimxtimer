@@ -8,8 +8,8 @@ endif
 CPPFLAGS += -Iinclude -I. -I../
 CFLAGS += -fPIC
 
-LDFLAGS += -L../gimxlog
-LDLIBS += -lgimxlog
+LDFLAGS += -L../gimxlog -L../gimxtime
+LDLIBS += -lgimxlog -lgimxtime
 
 include Makedefs
 
