@@ -12,6 +12,7 @@
 #include <gimxtimer/include/gtimer.h>
 #include <gimxprio/include/gprio.h>
 #include <gimxtime/include/gtime.h>
+#include <gimxlog/include/glog.h>
 
 #include <gimxcommon/test/common.h>
 #include <gimxcommon/test/handlers.c>
@@ -121,11 +122,20 @@ static int timer_read_callback(void * user) {
 
 int main(int argc, char* argv[]) {
 
+  printf("Press enter to continue.\n");
+  fflush(stdout);
+
+  getchar();
+
   setup_handlers();
 
   read_args(argc, argv);
 
-  gprio();
+  glog_set_all_levels(E_GLOG_LEVEL_DEBUG);
+
+  if (gprio_init() < 0) {
+  	set_done();
+  }
 
   unsigned int i;
   for (i = 0; i < sizeof(timers) / sizeof(*timers); ++i) {
@@ -152,6 +162,8 @@ int main(int argc, char* argv[]) {
   for (i = 0; i < sizeof(timers) / sizeof(*timers); ++i) {
     gtimer_close(timers[i].timer);
   }
+  
+  gprio_clean();
 
   fprintf(stderr, "Exiting\n");
 

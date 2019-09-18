@@ -75,23 +75,30 @@ struct gtimer * gtimer_start(void * user, unsigned int usec, const GTIMER_CALLBA
       .fp_register = callbacks->fp_register,
       .fp_remove = callbacks->fp_remove,
     };
-    int timer_resolution = timerres_begin(&poll_interface, timer_cb);
-    if (timer_resolution < 0) {
+    unsigned int timer_resolution = timerres_begin(&poll_interface, timer_cb);
+    if (timer_resolution == 0) {
         return NULL;
     }
     
-    unsigned int period = usec * 10 / timer_resolution;
-    if (period == 0) {
+    unsigned int requested = usec * 10;
+
+    unsigned int lowest = timer_resolution * 9 / 10;
+    if (requested < lowest) {
         if (GLOG_LEVEL(GLOG_NAME,ERROR)) {
-            fprintf(stderr, "%s:%d %s: timer period should be at least %dus\n", __FILE__, __LINE__, __func__, timer_resolution / 10);
+            fprintf(stderr, "%s:%d %s: timer period should be higher than %dus\n", __FILE__, __LINE__, __func__, lowest / 10);
         }
         timerres_end();
         return NULL;
     }
 
+    unsigned int lower = requested / timer_resolution;
+    unsigned int remainder = requested % timer_resolution;
+    unsigned int upper = lower + 1;
+    unsigned int period = (timer_resolution - remainder > remainder) ? lower : upper;
+
     if (period * timer_resolution != usec * 10) {
         if (GLOG_LEVEL(GLOG_NAME,INFO)) {
-            printf("rounding timer period to %u\n", period * timer_resolution / 10);
+            printf("rounding timer period %uus to %uus\n", usec, period * timer_resolution / 10);
         }
     }
 
