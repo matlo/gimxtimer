@@ -16,7 +16,6 @@
 
 #include <gimxcommon/test/common.h>
 #include <gimxcommon/test/handlers.c>
-#include <gimxcommon/test/timer.c>
 
 static unsigned int samples = 0;
 
@@ -147,7 +146,7 @@ int main(int argc, char* argv[]) {
             .fp_remove = REMOVE_FUNCTION,
     };
     timers[i].timer = gtimer_start(timers + i, timers[i].usec, &timer_callbacks);
-    if (timers[i].timer < 0) {
+    if (timers[i].timer == NULL) {
       set_done();
       break;
     }
