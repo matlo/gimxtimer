@@ -179,11 +179,13 @@ int main(int argc, char* argv[]) {
   printf("\t>%d\n", slices[j - 1]);
 
   for (i = 0; i < sizeof(timers) / sizeof(*timers); ++i) {
-    printf("%d\t%uus\t%u\t%u%%", i, timers[i].usec, timers[i].count, timers[i].sum / timers[i].count * 100 / timers[i].usec);
-    for (j = 0; j < sizeof(timers[i].slices) / sizeof(*timers[i].slices); ++j) {
-      printf("\t%d", timers[i].slices[j]);
+    if (timers[i].count) {
+      printf("%d\t%uus\t%u\t%u%%", i, timers[i].usec, timers[i].count, timers[i].sum / timers[i].count * 100 / timers[i].usec);
+      for (j = 0; j < sizeof(timers[i].slices) / sizeof(*timers[i].slices); ++j) {
+        printf("\t%d", timers[i].slices[j]);
+      }
+      printf("\n");
     }
-    printf("\n");
   }
 
   return 0;

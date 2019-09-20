@@ -45,24 +45,24 @@ void timerres_init(void) {
 
     HMODULE hNtdll = GetModuleHandle("ntdll.dll");
     if (hNtdll == INVALID_HANDLE_VALUE) {
-        PRINT_ERROR_GETLASTERROR("GetModuleHandle ntdll.dll")
+        PRINT_ERROR_GETLASTERROR("GetModuleHandle ntdll.dll");
         exit(-1);
     }
     pNtQueryTimerResolution = (void (__stdcall *)(PULONG, PULONG, PULONG)) GetProcAddress(hNtdll,
             "NtQueryTimerResolution");
     if (pNtQueryTimerResolution == NULL) {
-        PRINT_ERROR_GETLASTERROR("GetProcAddress NtQueryTimerResolution")
+        PRINT_ERROR_GETLASTERROR("GetProcAddress NtQueryTimerResolution");
         exit(-1);
     }
     pNtSetTimerResolution = (void (__stdcall *)(ULONG, BOOL, PULONG)) GetProcAddress(hNtdll, "NtSetTimerResolution");
     if (pNtSetTimerResolution == NULL) {
-        PRINT_ERROR_GETLASTERROR("GetProcAddress NtSetTimerResolution")
+        PRINT_ERROR_GETLASTERROR("GetProcAddress NtSetTimerResolution");
         exit(-1);
     }
 
     hTimer = CreateWaitableTimer(NULL, FALSE, NULL);
     if (hTimer == INVALID_HANDLE_VALUE) {
-        PRINT_ERROR_GETLASTERROR("CreateWaitableTimer")
+        PRINT_ERROR_GETLASTERROR("CreateWaitableTimer");
         exit(-1);
     }
 
@@ -73,7 +73,7 @@ void timerres_init(void) {
     debug.nbcores = sysinfo.dwNumberOfProcessors;
     debug.cores = calloc(debug.nbcores, sizeof(*debug.cores));
     if (debug.cores == NULL) {
-        PRINT_ERROR_ALLOC_FAILED("calloc")
+        PRINT_ERROR_ALLOC_FAILED("calloc");
         exit(-1);
     }
 }
@@ -116,7 +116,7 @@ static int read_callback(void * user __attribute__((unused))) {
     }
     LARGE_INTEGER li = { .QuadPart = now.QuadPart - next.QuadPart };
     if (unlikely(!SetWaitableTimer(hTimer, &li, 0, NULL, NULL, FALSE))) {
-        PRINT_ERROR_GETLASTERROR("SetWaitableTimer")
+        PRINT_ERROR_GETLASTERROR("SetWaitableTimer");
         return -1;
     }
 
@@ -146,13 +146,13 @@ static int start_timer() {
 
     LARGE_INTEGER li = { .QuadPart = -1 };
     if (!SetWaitableTimer(hTimer, &li, 0, NULL, NULL, FALSE)) {
-        PRINT_ERROR_GETLASTERROR("SetWaitableTimer")
+        PRINT_ERROR_GETLASTERROR("SetWaitableTimer");
         return -1;
     }
 
     DWORD lresult = WaitForSingleObject(hTimer, 1);
     if (lresult == WAIT_FAILED) {
-        PRINT_ERROR_GETLASTERROR("WaitForSingleObject")
+        PRINT_ERROR_GETLASTERROR("WaitForSingleObject");
         return -1;
     }
 
@@ -162,7 +162,7 @@ static int start_timer() {
 
     li.QuadPart = -currentResolution;
     if (!SetWaitableTimer(hTimer, &li, 0, NULL, NULL, FALSE)) {
-        PRINT_ERROR_GETLASTERROR("SetWaitableTimer")
+        PRINT_ERROR_GETLASTERROR("SetWaitableTimer");
         return -1;
     }
 
@@ -208,16 +208,18 @@ void timerres_end() {
 #define STR(s) #s
 
 #define CHECK_FUNCTION(FUNCTION) \
-    if (FUNCTION == NULL) { \
-        PRINT_ERROR_OTHER(XSTR(FUNCTION)" is NULL") \
-        return -1; \
-    }
+    do { \
+        if (FUNCTION == NULL) { \
+            PRINT_ERROR_OTHER(XSTR(FUNCTION)" is NULL"); \
+            return -1; \
+        } \
+    } while (0)
 
 unsigned int timerres_begin(const GPOLL_INTERFACE * poll_interface, TIMERRES_CALLBACK timer_cb) {
 
-    CHECK_FUNCTION (poll_interface->fp_register)
-    CHECK_FUNCTION (poll_interface->fp_remove)
-    CHECK_FUNCTION (timer_cb)
+    CHECK_FUNCTION (poll_interface->fp_register);
+    CHECK_FUNCTION (poll_interface->fp_remove);
+    CHECK_FUNCTION (timer_cb);
 
     // TODO MLA: warn if register / remove functions change
     // on Windows function pointers to gpoll_register/remove inside and outside the dll do not match.

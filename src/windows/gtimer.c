@@ -52,22 +52,22 @@ static int timer_cb(unsigned int nexp) {
 struct gtimer * gtimer_start(void * user, unsigned int usec, const GTIMER_CALLBACKS * callbacks) {
 
     if (usec == 0) {
-        PRINT_ERROR_OTHER("timer period cannot be 0")
+        PRINT_ERROR_OTHER("timer period cannot be 0");
         return NULL;
     }
 
     if (callbacks->fp_read == 0) {
-        PRINT_ERROR_OTHER("fp_read is null")
+        PRINT_ERROR_OTHER("fp_read is null");
         return NULL;
     }
 
     if (callbacks->fp_register == 0) {
-        PRINT_ERROR_OTHER("fp_register is null")
+        PRINT_ERROR_OTHER("fp_register is null");
         return NULL;
     }
 
     if (callbacks->fp_remove == 0) {
-        PRINT_ERROR_OTHER("fp_remove is null")
+        PRINT_ERROR_OTHER("fp_remove is null");
         return NULL;
     }
 
@@ -104,7 +104,7 @@ struct gtimer * gtimer_start(void * user, unsigned int usec, const GTIMER_CALLBA
 
     struct gtimer * timer = calloc(1, sizeof(*timer));
     if (timer == NULL) {
-      PRINT_ERROR_ALLOC_FAILED("calloc")
+      PRINT_ERROR_ALLOC_FAILED("calloc");
       timerres_end();
       return NULL;
     }

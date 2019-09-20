@@ -45,7 +45,7 @@ static int read_callback(void * user) {
 
   res = read(timer->fd, &nexp, sizeof(nexp));
   if (res != sizeof(nexp)) {
-    PRINT_ERROR_ERRNO("read")
+    PRINT_ERROR_ERRNO("read");
     return -1;
   }
   if (nexp > 1) {
@@ -67,32 +67,32 @@ struct gtimer * gtimer_start(void * user, unsigned int usec, const GTIMER_CALLBA
 
   if (callbacks->fp_register == NULL)
   {
-    PRINT_ERROR_OTHER("fp_register is NULL")
+    PRINT_ERROR_OTHER("fp_register is NULL");
     return NULL;
   }
 
   if (callbacks->fp_remove == NULL)
   {
-    PRINT_ERROR_OTHER("fp_remove is NULL")
+    PRINT_ERROR_OTHER("fp_remove is NULL");
     return NULL;
   }
 
   int tfd = timerfd_create(CLOCK_MONOTONIC, 0);
   if (tfd < 0) {
-    PRINT_ERROR_ERRNO("timerfd_create")
+    PRINT_ERROR_ERRNO("timerfd_create");
     return NULL;
   }
 
   int ret = timerfd_settime(tfd, 0, &new_value, NULL);
   if (ret) {
-    PRINT_ERROR_ERRNO("timerfd_settime")
+    PRINT_ERROR_ERRNO("timerfd_settime");
     close(tfd);
     return NULL;
   }
 
   struct gtimer * timer = calloc(1, sizeof(*timer));
   if (timer == NULL) {
-    PRINT_ERROR_ALLOC_FAILED("calloc")
+    PRINT_ERROR_ALLOC_FAILED("calloc");
     return NULL;
   }
 
