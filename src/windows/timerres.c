@@ -187,7 +187,7 @@ void timerres_end() {
             pNtSetTimerResolution(0, FALSE, &currentResolution);
             fp_remove(hTimer);
             if (GLOG_LEVEL(GLOG_NAME,DEBUG) && debug.count) {
-                printf("base timer: count = %u, missed = %u (%.02f%%)\n", debug.count, debug.missed, (double)debug.missed * 100 / debug.count);
+                printf("base timer: count = %u, missed = %u (%.02f%%)\n", debug.count, debug.missed, (double)debug.missed * 100 / (debug.count + debug.missed));
                 printf("timer count per core: ");
                 unsigned int i;
                 for (i = 0; i < debug.nbcores; ++i) {
