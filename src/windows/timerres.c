@@ -48,13 +48,13 @@ void timerres_init(void) {
         PRINT_ERROR_GETLASTERROR("GetModuleHandle ntdll.dll");
         exit(-1);
     }
-    pNtQueryTimerResolution = (void (__stdcall *)(PULONG, PULONG, PULONG)) GetProcAddress(hNtdll,
+    pNtQueryTimerResolution = (void (__stdcall *)(PULONG, PULONG, PULONG))(void (*)(void)) GetProcAddress(hNtdll,
             "NtQueryTimerResolution");
     if (pNtQueryTimerResolution == NULL) {
         PRINT_ERROR_GETLASTERROR("GetProcAddress NtQueryTimerResolution");
         exit(-1);
     }
-    pNtSetTimerResolution = (void (__stdcall *)(ULONG, BOOL, PULONG)) GetProcAddress(hNtdll, "NtSetTimerResolution");
+    pNtSetTimerResolution = (void (__stdcall *)(ULONG, BOOL, PULONG))(void (*)(void)) GetProcAddress(hNtdll, "NtSetTimerResolution");
     if (pNtSetTimerResolution == NULL) {
         PRINT_ERROR_GETLASTERROR("GetProcAddress NtSetTimerResolution");
         exit(-1);
