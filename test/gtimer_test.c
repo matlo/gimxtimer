@@ -18,6 +18,8 @@
 #include <gimxcommon/test/handlers.c>
 
 static unsigned int samples = 0;
+static int debug = 0;
+static int prio = 0;
 
 static int slices[] = { 10, 25, 50, 100, 200 };
 
@@ -56,10 +58,16 @@ static void usage() {
 static int read_args(int argc, char* argv[]) {
 
   int opt;
-  while ((opt = getopt(argc, argv, "n:")) != -1) {
+  while ((opt = getopt(argc, argv, "dn:p")) != -1) {
     switch (opt) {
+    case 'd':
+      debug = 1;
+      break;
     case 'n':
       samples = atoi(optarg);
+      break;
+    case 'p':
+      prio = 1;
       break;
     default: /* '?' */
       usage();
@@ -98,15 +106,13 @@ static int timer_read_callback(void * user) {
 
   struct timer_test * timer = (struct timer_test *) user;
 
-  long long int diff = gtime_gettime() - timer->next;
+  gtimediff diff = gtime_gettime() - timer->next;
 
   // Tolerate early firing:
   // - the delay between the timer firing and the process scheduling may vary
-  // - on Windows the timer period is rounded to the highest multiple of the timer resolution not higher than the timer period.
+  // - on Windows the timer period is rounded to the nearest multiple of the timer resolution.
 
-  diff = abs(diff);
-
-  process(user, abs(diff));
+  process(user, llabs(diff));
 
 #ifdef WIN32
   timer->next = gtime_gettime() + timer->usec;
@@ -130,9 +136,11 @@ int main(int argc, char* argv[]) {
 
   read_args(argc, argv);
 
-  glog_set_all_levels(E_GLOG_LEVEL_DEBUG);
+  if (debug) {
+    glog_set_all_levels(E_GLOG_LEVEL_DEBUG);
+  }
 
-  if (gprio_init() < 0) {
+  if (prio && gprio_init() < 0) {
   	set_done();
   }
 
@@ -161,8 +169,11 @@ int main(int argc, char* argv[]) {
   for (i = 0; i < sizeof(timers) / sizeof(*timers); ++i) {
     gtimer_close(timers[i].timer);
   }
-  
-  gprio_clean();
+
+  if (prio)
+  {
+    gprio_clean();
+  }
 
   fprintf(stderr, "Exiting\n");
 
