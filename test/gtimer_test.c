@@ -19,6 +19,7 @@
 
 static unsigned int samples = 0;
 static int debug = 0;
+static int trace = 0;
 static int prio = 0;
 
 static int slices[] = { 5, 10, 25, 50, 100 };
@@ -48,7 +49,7 @@ static struct timer_test timers[] = {
 };
 
 static void usage() {
-  fprintf(stderr, "Usage: ./gtimer_test [-n samples]\n");
+  fprintf(stderr, "Usage: ./gtimer_test [-d] [-n samples] [-p] [-t]\n");
   exit(EXIT_FAILURE);
 }
 
@@ -58,7 +59,7 @@ static void usage() {
 static int read_args(int argc, char* argv[]) {
 
   int opt;
-  while ((opt = getopt(argc, argv, "dn:p")) != -1) {
+  while ((opt = getopt(argc, argv, "dn:pt")) != -1) {
     switch (opt) {
     case 'd':
       debug = 1;
@@ -68,6 +69,9 @@ static int read_args(int argc, char* argv[]) {
       break;
     case 'p':
       prio = 1;
+      break;
+    case 't':
+      trace = 1;
       break;
     default: /* '?' */
       usage();
@@ -139,7 +143,12 @@ int main(int argc, char* argv[]) {
   read_args(argc, argv);
 
   if (debug) {
-    glog_set_all_levels(E_GLOG_LEVEL_DEBUG);
+    glog_set_level("gimxtimer", E_GLOG_LEVEL_DEBUG);
+    glog_set_level("gimxprio", E_GLOG_LEVEL_DEBUG);
+  }
+  if (trace) {
+    glog_set_level("gimxtimer", E_GLOG_LEVEL_TRACE);
+    glog_set_level("gimxprio", E_GLOG_LEVEL_TRACE);
   }
 
   if (prio && gprio_init() < 0) {
