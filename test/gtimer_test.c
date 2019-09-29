@@ -21,18 +21,18 @@ static unsigned int samples = 0;
 static int debug = 0;
 static int prio = 0;
 
-static int slices[] = { 10, 25, 50, 100, 200 };
+static int slices[] = { 5, 10, 25, 50, 100 };
 
 struct timer_test {
-    unsigned int usec;
+    gtime period;
     struct gtimer * timer;
     gtime next;
-    unsigned int sum;
+    gtime sum;
     unsigned int count;
     unsigned int slices[sizeof(slices) / sizeof(*slices) + 1];
 };
 
-#define ADD_TEST(PERIOD) { PERIOD, NULL, 0, 0, 0, {} },
+#define ADD_TEST(PERIOD) { PERIOD * 1000LL, NULL, 0, 0, 0, {} },
 
 static struct timer_test timers[] = {
     ADD_TEST(1000)
@@ -84,7 +84,7 @@ static int timer_close_callback(void * user __attribute__((unused))) {
 
 static inline void process(struct timer_test * timer, long long int diff) {
 
-  int percent = diff * 100 / timer->usec;
+  int percent = diff * 100 / timer->period;
 
   unsigned int i;
   for (i = 0; i < sizeof(slices) / sizeof(*slices); ++i) {
@@ -106,7 +106,9 @@ static int timer_read_callback(void * user) {
 
   struct timer_test * timer = (struct timer_test *) user;
 
-  gtimediff diff = gtime_gettime() - timer->next;
+  gtime now = gtime_gettime();
+
+  gtimediff diff = now - timer->next;
 
   // Tolerate early firing:
   // - the delay between the timer firing and the process scheduling may vary
@@ -115,11 +117,11 @@ static int timer_read_callback(void * user) {
   process(user, llabs(diff));
 
 #ifdef WIN32
-  timer->next = gtime_gettime() + timer->usec;
+  timer->next = now + timer->period;
 #else
   do {
-    timer->next += timer->usec;
-  } while (timer->next <= gtime_gettime());
+    timer->next += timer->period;
+  } while (timer->next <= now);
 #endif
 
   return 1; // Returning a non-zero value makes gpoll return, allowing to check the 'done' variable.
@@ -153,13 +155,13 @@ int main(int argc, char* argv[]) {
             .fp_register = REGISTER_FUNCTION,
             .fp_remove = REMOVE_FUNCTION,
     };
-    timers[i].timer = gtimer_start(timers + i, timers[i].usec, &timer_callbacks);
+    timers[i].timer = gtimer_start(timers + i, timers[i].period / 1000, &timer_callbacks);
     if (timers[i].timer == NULL) {
       set_done();
       break;
     }
 
-    timers[i].next = gtime_gettime() + timers[i].usec;
+    timers[i].next = gtime_gettime() + timers[i].period;
   }
 
   while(!is_done()) {
@@ -191,7 +193,7 @@ int main(int argc, char* argv[]) {
 
   for (i = 0; i < sizeof(timers) / sizeof(*timers); ++i) {
     if (timers[i].count) {
-      printf("%d\t%uus\t%u\t%u%%", i, timers[i].usec, timers[i].count, timers[i].sum / timers[i].count * 100 / timers[i].usec);
+      printf("%d\t%I64dus\t%u\t%I64d/1K", i, timers[i].period / 1000, timers[i].count, timers[i].sum * 1000 / timers[i].count / timers[i].period);
       for (j = 0; j < sizeof(timers[i].slices) / sizeof(*timers[i].slices); ++j) {
         printf("\t%d", timers[i].slices[j]);
       }
