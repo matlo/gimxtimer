@@ -7,6 +7,7 @@
 #include <windows.h>
 #include <gimxcommon/include/gerror.h>
 #include <gimxlog/include/glog.h>
+#include <gimxcommon/include/gperf.h>
 
 GLOG_GET(GLOG_NAME)
 
@@ -18,11 +19,13 @@ static HANDLE hTimer = INVALID_HANDLE_VALUE;
 static GPOLL_REGISTER_SOURCE fp_register = NULL;
 static GPOLL_REMOVE_SOURCE fp_remove = NULL;
 static int (*timer_callback)(unsigned int) = NULL;
+static ULONG minimumResolution = 0;
 static ULONG currentResolution = 0;
-static LARGE_INTEGER last = {};
-static LARGE_INTEGER next = {};
+static gtime resolution = 0;
+static gtime last = 0;
+static LARGE_INTEGER nextTick = { .QuadPart = -1 };
 
-static LARGE_INTEGER freq = { 0 };
+#define MAX_SAMPLES 10000
 
 static struct {
     unsigned int count;
@@ -30,15 +33,14 @@ static struct {
     unsigned int slices[10];
     DWORD nbcores;
     unsigned int * cores;
+    struct {
+        gtime now;
+        unsigned int nexp;
+        LONGLONG delta;
+    } * samples;
+    unsigned int nbsamples;
 } debug = {
 };
-
-static inline LARGE_INTEGER timerres_get_time() {
-    LARGE_INTEGER tnow;
-    QueryPerformanceCounter(&tnow);
-    tnow.QuadPart = tnow.QuadPart * 10000000ULL / freq.QuadPart;
-    return tnow;
-}
 
 void timerres_init(void) __attribute__((constructor));
 void timerres_init(void) {
@@ -66,8 +68,6 @@ void timerres_init(void) {
         exit(-1);
     }
 
-    QueryPerformanceFrequency(&freq);
-
     SYSTEM_INFO sysinfo;
     GetSystemInfo(&sysinfo);
     debug.nbcores = sysinfo.dwNumberOfProcessors;
@@ -91,52 +91,75 @@ static int close_callback(void * user __attribute__((unused))) {
     return -1;
 }
 
-#define unlikely(x)    __builtin_expect(!!(x), 0)
+GPERF_INST(timerres)
 
-// Warning: preemption may happen anytime, and timer_callback may take some time.
-// Reset the timer until no period elapsed.
 static int read_callback(void * user __attribute__((unused))) {
 
-    ++debug.count;
+    gtime now = gtime_gettime();
+
+    if (GLOG_LEVEL(GLOG_NAME,DEBUG)) {
+        GPERF_TICK(timerres, now);
+    }
+
+    // reset the timer before doing anything else
+    BOOL result = SetWaitableTimer(hTimer, &nextTick, 0, NULL, NULL, FALSE);
+    DWORD error = GetLastError();
+
+    gtime delta = now - last;
+    unsigned int nexp = (delta + resolution / 2) / resolution;
 
     int ret = 0;
 
-    LARGE_INTEGER now = timerres_get_time();
-    LONGLONG delta = now.QuadPart - last.QuadPart;
-    unsigned int nexp = delta / currentResolution;
     if (nexp > 0) {
+
+        last = now;
+
         int lret = timer_callback(nexp);
         if (lret < 0) {
             ret = -1;
         } else if (ret != -1 && lret) {
             ret = 1;
         }
-        last.QuadPart += nexp * currentResolution;
-        next.QuadPart += nexp * currentResolution;
+
+        if (GLOG_LEVEL(GLOG_NAME,DEBUG)) {
+
+            ++debug.count;
+
+            debug.cores[GetCurrentProcessorNumber()] += 1;
+
+            if (nexp > 1) {
+                unsigned int slice = sizeof(debug.slices) / sizeof(*debug.slices) - 1;
+                if (nexp - 2 < slice) {
+                    slice = nexp - 2;
+                }
+                debug.slices[slice] += 1;
+                debug.missed += (nexp - 1);
+            }
+        }
     }
-    LARGE_INTEGER li = { .QuadPart = now.QuadPart - next.QuadPart };
-    if (unlikely(!SetWaitableTimer(hTimer, &li, 0, NULL, NULL, FALSE))) {
+
+    if (GLOG_LEVEL(GLOG_NAME,TRACE)) {
+        if (debug.nbsamples < MAX_SAMPLES) {
+            // print traces at the end to make sure they don't impact performance
+            if (debug.samples == NULL) {
+                debug.samples = calloc(MAX_SAMPLES, sizeof(*debug.samples));
+                if (debug.samples == NULL) {
+                    PRINT_ERROR_ALLOC_FAILED("calloc");
+                }
+            }
+            if (debug.samples != NULL) {
+                debug.samples[debug.nbsamples].now = now;
+                debug.samples[debug.nbsamples].nexp = nexp;
+                debug.samples[debug.nbsamples].delta = delta;
+                ++debug.nbsamples;
+            }
+        }
+    }
+
+    if (!result) {
+        SetLastError(error);
         PRINT_ERROR_GETLASTERROR("SetWaitableTimer");
         return -1;
-    }
-
-    if (GLOG_LEVEL(GLOG_NAME,DEBUG)) {
-
-        debug.cores[GetCurrentProcessorNumber()] += 1;
-
-        if (nexp > 1) {
-            unsigned int slice = sizeof(debug.slices) / sizeof(*debug.slices) - 1;
-            if (nexp - 2 < slice) {
-                slice = nexp - 2;
-            }
-            debug.slices[slice] += 1;
-            debug.missed += (nexp - 1);
-        }
-
-        if (GLOG_LEVEL(GLOG_NAME,TRACE)) {
-            LARGE_INTEGER end = timerres_get_time();
-            printf("--- delta = %I64d nexp = %u next = %I64d time = %I64d\n", delta, nexp, li.QuadPart, end.QuadPart - now.QuadPart);
-        }
     }
 
     return ret;
@@ -144,24 +167,20 @@ static int read_callback(void * user __attribute__((unused))) {
 
 static int start_timer() {
 
-    LARGE_INTEGER li = { .QuadPart = -1 };
-    if (!SetWaitableTimer(hTimer, &li, 0, NULL, NULL, FALSE)) {
+    if (!SetWaitableTimer(hTimer, &nextTick, 0, NULL, NULL, FALSE)) {
         PRINT_ERROR_GETLASTERROR("SetWaitableTimer");
         return -1;
     }
 
-    DWORD lresult = WaitForSingleObject(hTimer, 1);
+    DWORD lresult = WaitForSingleObject(hTimer, INFINITE);
     if (lresult == WAIT_FAILED) {
         PRINT_ERROR_GETLASTERROR("WaitForSingleObject");
         return -1;
     }
 
-    last = timerres_get_time();
+    last = gtime_gettime();
 
-    next.QuadPart = last.QuadPart + currentResolution;
-
-    li.QuadPart = -currentResolution;
-    if (!SetWaitableTimer(hTimer, &li, 0, NULL, NULL, FALSE)) {
+    if (!SetWaitableTimer(hTimer, &nextTick, 0, NULL, NULL, FALSE)) {
         PRINT_ERROR_GETLASTERROR("SetWaitableTimer");
         return -1;
     }
@@ -184,21 +203,36 @@ void timerres_end() {
     if (nb_users > 0) {
         --nb_users;
         if (nb_users == 0) {
-            pNtSetTimerResolution(0, FALSE, &currentResolution);
+            ULONG maximumResolution;
+            ULONG previousResolution;
+            pNtQueryTimerResolution(&minimumResolution, &maximumResolution, &previousResolution);
+            pNtSetTimerResolution(minimumResolution, TRUE, &currentResolution);
+            if (GLOG_LEVEL(GLOG_NAME,DEBUG)) {
+                printf("Timer resolution: previous=%lu current=%lu\n", previousResolution, currentResolution);
+            }
             fp_remove(hTimer);
             if (GLOG_LEVEL(GLOG_NAME,DEBUG) && debug.count) {
-                printf("base timer: count = %u, missed = %u (%.02f%%)\n", debug.count, debug.missed, (double)debug.missed * 100 / (debug.count + debug.missed));
                 printf("timer count per core: ");
                 unsigned int i;
                 for (i = 0; i < debug.nbcores; ++i) {
                     printf(" %u", debug.cores[i]);
                 }
                 printf("\n");
+                printf("base timer: count = %u, missed = %u (%.02f%%)\n", debug.count, debug.missed, (double)debug.missed * 100 / (debug.count + debug.missed));
                 printf("missed slices: ");
                 for (i = 0; i < sizeof(debug.slices) / sizeof(*debug.slices) - 1; ++i) {
                     printf(" [%u] %u", i + 1, debug.slices[i]);
                 }
                 printf(" [%u+] %u\n", i + 1, debug.slices[i]);
+                if (GLOG_LEVEL(GLOG_NAME,TRACE)) {
+                    if (debug.nbsamples == MAX_SAMPLES) {
+                        printf("only showing %u samples\n", MAX_SAMPLES);
+                    }
+                    for (i = 0; i < debug.nbsamples; ++i) {
+                        printf("now = %I64d nexp = %u delta = %I64d\n", debug.samples[i].now, debug.samples[i].nexp, debug.samples[i].delta);
+                    }
+                }
+                GPERF_LOG(timerres);
             }
         }
     }
@@ -230,13 +264,16 @@ unsigned int timerres_begin(const GPOLL_INTERFACE * poll_interface, TIMERRES_CAL
 
     if (nb_users == 1) {
 
-        ULONG minimumResolution, maximumResolution;
-        pNtQueryTimerResolution(&minimumResolution, &maximumResolution, &currentResolution);
+        ULONG maximumResolution;
+        ULONG previousResolution;
+        pNtQueryTimerResolution(&minimumResolution, &maximumResolution, &previousResolution);
 
         pNtSetTimerResolution(maximumResolution, TRUE, &currentResolution);
 
+        resolution = currentResolution * 100ULL;
+
         if (GLOG_LEVEL(GLOG_NAME,DEBUG)) {
-            printf("Timer resolution: min=%lu max=%lu current=%lu\n", minimumResolution, maximumResolution, currentResolution);
+            printf("Timer resolution: min=%lu max=%lu previous=%lu current=%lu\n", minimumResolution, maximumResolution, previousResolution, currentResolution);
         }
 
         timer_callback = timer_cb;
