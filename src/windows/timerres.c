@@ -7,6 +7,7 @@
 #include <windows.h>
 #include <gimxcommon/include/gerror.h>
 #include <gimxlog/include/glog.h>
+#include <gimxtime/include/gtime.h>
 #include <gimxcommon/include/gperf.h>
 
 GLOG_GET(GLOG_NAME)
