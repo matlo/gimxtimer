@@ -34,12 +34,6 @@ static struct {
     unsigned int slices[10];
     DWORD nbcores;
     unsigned int * cores;
-    struct {
-        gtime now;
-        unsigned int nexp;
-        LONGLONG delta;
-    } * samples;
-    unsigned int nbsamples;
 } debug = {
 };
 
@@ -92,7 +86,19 @@ static int close_callback(void * user __attribute__((unused))) {
     return -1;
 }
 
-static GPERF_INST(timerres);
+#define SAMPLETYPE \
+    struct { \
+            gtime now; \
+            unsigned int nexp; \
+            gtime delta; \
+        }
+
+#define NBSAMPLES 20000 // 10s for a resolution of 0.5ms
+
+#define SAMPLEPRINT(SAMPLE) \
+    printf("now = %I64u nexp = %u delta = %I64u\n", SAMPLE.now, SAMPLE.nexp, SAMPLE.delta)
+
+static GPERF_INST(timerres, SAMPLETYPE, NBSAMPLES);
 
 static int read_callback(void * user __attribute__((unused))) {
 
@@ -107,7 +113,7 @@ static int read_callback(void * user __attribute__((unused))) {
     DWORD error = GetLastError();
 
     gtime delta = now - last;
-    unsigned int nexp = (delta + resolution / 2) / resolution;
+    unsigned int nexp = (delta + resolution / 2) / resolution; // delta can be lower than resolution
 
     int ret = 0;
 
@@ -140,21 +146,10 @@ static int read_callback(void * user __attribute__((unused))) {
     }
 
     if (GLOG_LEVEL(GLOG_NAME,TRACE)) {
-        if (debug.nbsamples < MAX_SAMPLES) {
-            // print traces at the end to make sure they don't impact performance
-            if (debug.samples == NULL) {
-                debug.samples = calloc(MAX_SAMPLES, sizeof(*debug.samples));
-                if (debug.samples == NULL) {
-                    PRINT_ERROR_ALLOC_FAILED("calloc");
-                }
-            }
-            if (debug.samples != NULL) {
-                debug.samples[debug.nbsamples].now = now;
-                debug.samples[debug.nbsamples].nexp = nexp;
-                debug.samples[debug.nbsamples].delta = delta;
-                ++debug.nbsamples;
-            }
-        }
+        GPERF_SAMPLE(timerres).now = now;
+        GPERF_SAMPLE(timerres).nexp = nexp;
+        GPERF_SAMPLE(timerres).delta = delta;
+        GPERF_SAMPLE_INC(timerres);
     }
 
     if (!result) {
@@ -226,12 +221,7 @@ void timerres_end() {
                 }
                 printf(" [%u+] %u\n", i + 1, debug.slices[i]);
                 if (GLOG_LEVEL(GLOG_NAME,TRACE)) {
-                    if (debug.nbsamples == MAX_SAMPLES) {
-                        printf("only showing %u samples\n", MAX_SAMPLES);
-                    }
-                    for (i = 0; i < debug.nbsamples; ++i) {
-                        printf("now = %I64d nexp = %u delta = %I64d\n", debug.samples[i].now, debug.samples[i].nexp, debug.samples[i].delta);
-                    }
+                    GPERF_SAMPLE_PRINT(timerres, SAMPLEPRINT);
                 }
                 GPERF_LOG(timerres);
             }
