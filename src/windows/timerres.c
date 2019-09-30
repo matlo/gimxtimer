@@ -91,7 +91,7 @@ static int close_callback(void * user __attribute__((unused))) {
     return -1;
 }
 
-GPERF_INST(timerres)
+static GPERF_INST(timerres);
 
 static int read_callback(void * user __attribute__((unused))) {
 
