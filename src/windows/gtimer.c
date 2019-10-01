@@ -22,10 +22,11 @@ struct gtimer {
     unsigned int nexp; // number of base timer ticks since last event
     int (*fp_read)(void * user);
     int (*fp_close)(void * user);
-    GLIST_LINK(struct gtimer)
+    GLIST_LINK(struct gtimer);
 };
 
-GLIST_INST(struct gtimer, timers, gtimer_close)
+GLIST_INST(struct gtimer, timers);
+GLIST_DESTRUCTOR(timers, gtimer_close)
 
 static int timer_cb(unsigned int nexp) {
 

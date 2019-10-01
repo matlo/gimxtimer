@@ -24,10 +24,11 @@ struct gtimer {
   GPOLL_READ_CALLBACK fp_read;
   GPOLL_CLOSE_CALLBACK fp_close;
   GTIMER_REMOVE_SOURCE fp_remove;
-  GLIST_LINK(struct gtimer)
+  GLIST_LINK(struct gtimer);
 };
 
-GLIST_INST(struct gtimer, timers, gtimer_close)
+GLIST_INST(struct gtimer, timers);
+GLIST_DESTRUCTOR(timers, gtimer_close)
 
 static int close_callback(void * user) {
 
