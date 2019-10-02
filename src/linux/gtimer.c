@@ -128,7 +128,7 @@ struct gtimer * gtimer_start(void * user, unsigned int usec, const GTIMER_CALLBA
   timer->fp_close = callbacks->fp_close;
   timer->fp_remove = callbacks->fp_remove;
 
-  GLIST_ADD(timers, timer)
+  GLIST_ADD(timers, timer);
 
   return timer;
 }
@@ -142,7 +142,7 @@ int gtimer_close(struct gtimer * timer) {
     printf("timer: count = %u, missed = %u (%.02f%%)\n", timer->debug.count, timer->debug.missed, (double)timer->debug.missed * 100 / (timer->debug.count + timer->debug.missed));
   }
 
-  GLIST_REMOVE(timers, timer)
+  GLIST_REMOVE(timers, timer);
 
   free(timer);
 

@@ -116,14 +116,14 @@ struct gtimer * gtimer_start(void * user, unsigned int usec, const GTIMER_CALLBA
     timer->fp_read = callbacks->fp_read;
     timer->fp_close = callbacks->fp_close;
 
-    GLIST_ADD(timers, timer)
+    GLIST_ADD(timers, timer);
 
     return timer;
 }
 
 int gtimer_close(struct gtimer * timer) {
 
-    GLIST_REMOVE(timers, timer)
+    GLIST_REMOVE(timers, timer);
 
     free(timer);
 
