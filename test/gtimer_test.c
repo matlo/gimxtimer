@@ -133,14 +133,14 @@ static int timer_read_callback(void * user) {
 
 int main(int argc, char* argv[]) {
 
+  setup_handlers();
+
+  read_args(argc, argv);
+
   printf("Press enter to continue.\n");
   fflush(stdout);
 
   getchar();
-
-  setup_handlers();
-
-  read_args(argc, argv);
 
   if (debug) {
     glog_set_level("gimxtimer", E_GLOG_LEVEL_DEBUG);
@@ -202,7 +202,7 @@ int main(int argc, char* argv[]) {
 
   for (i = 0; i < sizeof(timers) / sizeof(*timers); ++i) {
     if (timers[i].count) {
-      printf("%d\t%I64dus\t%u\t%I64d/1K", i, timers[i].period / 1000, timers[i].count, timers[i].sum * 1000 / timers[i].count / timers[i].period);
+      printf("%d\t"GTIME_FS"us\t%u\t"GTIME_FS"/1K", i, timers[i].period / 1000, timers[i].count, timers[i].sum * 1000 / timers[i].count / timers[i].period);
       for (j = 0; j < sizeof(timers[i].slices) / sizeof(*timers[i].slices); ++j) {
         printf("\t%d", timers[i].slices[j]);
       }

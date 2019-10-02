@@ -96,7 +96,7 @@ static int close_callback(void * user __attribute__((unused))) {
 #define NBSAMPLES 20000 // 10s for a resolution of 0.5ms
 
 #define SAMPLEPRINT(SAMPLE) \
-    printf("now = %I64u nexp = %u delta = %I64u\n", SAMPLE.now, SAMPLE.nexp, SAMPLE.delta)
+    printf("now = "GTIME_FS" nexp = %u delta = "GTIME_FS"\n", SAMPLE.now, SAMPLE.nexp, SAMPLE.delta)
 
 static GPERF_INST(timerres, SAMPLETYPE, NBSAMPLES);
 

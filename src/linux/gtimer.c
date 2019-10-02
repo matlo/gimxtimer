@@ -25,6 +25,11 @@ struct gtimer {
   GPOLL_CLOSE_CALLBACK fp_close;
   GTIMER_REMOVE_SOURCE fp_remove;
   GLIST_LINK(struct gtimer);
+  struct {
+      unsigned int count;
+      unsigned int missed;
+      unsigned int slices[10];
+  } debug;
 };
 
 static GLIST_INST(struct gtimer, timers);
@@ -49,11 +54,19 @@ static int read_callback(void * user) {
     PRINT_ERROR_ERRNO("read");
     return -1;
   }
-  if (nexp > 1) {
-      gtime now = gtime_gettime();
-      if (GLOG_LEVEL(GLOG_NAME,ERROR)) {
-        fprintf (stderr, "%lu.%06lu timer fired %" PRIu64 " times...\n", GTIME_SECPART(now), GTIME_USECPART(now), nexp);
+
+  if (GLOG_LEVEL(GLOG_NAME,DEBUG)) {
+
+    ++(timer->debug.count);
+
+    if (nexp > 1) {
+      unsigned int slice = sizeof(timer->debug.slices) / sizeof(*timer->debug.slices) - 1;
+      if (nexp - 2 < slice) {
+        slice = nexp - 2;
       }
+      timer->debug.slices[slice] += 1;
+      timer->debug.missed += (nexp - 1);
+    }
   }
 
   return timer->fp_read(timer->user);
@@ -124,6 +137,10 @@ int gtimer_close(struct gtimer * timer) {
 
   timer->fp_remove(timer->fd);
   close(timer->fd);
+
+  if (GLOG_LEVEL(GLOG_NAME,DEBUG) && timer->debug.count) {
+    printf("timer: count = %u, missed = %u (%.02f%%)\n", timer->debug.count, timer->debug.missed, (double)timer->debug.missed * 100 / (timer->debug.count + timer->debug.missed));
+  }
 
   GLIST_REMOVE(timers, timer)
 
