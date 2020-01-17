@@ -26,7 +26,6 @@ struct gtimer {
 };
 
 static GLIST_INST(struct gtimer, timers);
-GLIST_DESTRUCTOR(timers, gtimer_close)
 
 static int timer_cb(unsigned int nexp) {
 
